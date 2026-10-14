@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Minimalist Paper Background Tile -->
+  <rect width="256" height="256" rx="56" fill="#fbf6eb" stroke="#e2d6c1" stroke-width="4"/>
+
+  <!-- Fountain Pen Nib -->
+  <g fill="none" stroke="#3d312a" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Solid Ink Nib Body -->
+    <path d="M128 206 L84 136 C80 110 88 80 92 50 L164 50 C168 80 176 110 172 136 Z" 
+          fill="#3d312a" 
+          stroke="#3d312a" 
+          stroke-width="4"/>
+    
+    <!-- Slit and Breather Hole Cutout -->
+    <line x1="128" y1="204" x2="128" y2="118" stroke="#fbf6eb" stroke-width="5"/>
+    <circle cx="128" cy="118" r="7" fill="#fbf6eb" stroke="#fbf6eb" stroke-width="2"/>
+    
+    <!-- Classical Engraved Arch Accent -->
+    <path d="M104 90 Q128 106 152 90" fill="none" stroke="#fbf6eb" stroke-width="4" opacity="0.9"/>
+  </g>
+</svg>
