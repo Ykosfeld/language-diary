@@ -40,7 +40,15 @@ def main() -> None:
     app.setApplicationName("Language Diary")
     app.setApplicationDisplayName("Diário de Idiomas")
 
+    icon_path = PROJECT_ROOT / "assets" / "icon.svg"
+    if icon_path.exists():
+        from PyQt6.QtGui import QIcon
+        app_icon = QIcon(str(icon_path))
+        app.setWindowIcon(app_icon)
+
     window = WriterWindow(config, repository, lock_manager)
+    if icon_path.exists():
+        window.setWindowIcon(app_icon)
     window.show()
 
     sys.exit(app.exec())

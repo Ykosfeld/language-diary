@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Circular Paper/Wax Stamp Base -->
+  <rect width="256" height="256" rx="56" fill="#f4ecd8"/>
+  <circle cx="128" cy="128" r="104" fill="#fbf6eb" stroke="#e2d6c1" stroke-width="4"/>
+  <circle cx="128" cy="128" r="92" fill="#8c4b2d" opacity="0.95"/>
+  <circle cx="128" cy="128" r="84" fill="none" stroke="#fbf6eb" stroke-width="2.5" stroke-dasharray="6 4" opacity="0.6"/>
+
+  <!-- Inner Fountain Pen Nib and Ink Accent -->
+  <g transform="translate(128, 128) rotate(-45) translate(-128, -128)">
+    <!-- Nib Body -->
+    <path d="M128 50 L156 120 L146 175 L110 175 L100 120 Z" fill="#fbf6eb" stroke="#fbf6eb" stroke-width="2" stroke-linejoin="round"/>
+    <!-- Nib Tip -->
+    <path d="M128 50 L128 116" stroke="#8c4b2d" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="128" cy="120" r="5" fill="#8c4b2d"/>
+    <!-- Collar Line -->
+    <path d="M106 148 Q128 156 150 148" fill="none" stroke="#8c4b2d" stroke-width="3"/>
+  </g>
+
+  <!-- Fresh Ink Drop -->
+  <circle cx="128" cy="186" r="6" fill="#fbf6eb"/>
+</svg>
