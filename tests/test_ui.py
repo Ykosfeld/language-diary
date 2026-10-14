@@ -73,3 +73,22 @@ def test_writer_window_locked_entry_read_only(qapp, test_setup):
     assert "Selada" in window.status_label.text()
 
     window.close()
+
+
+def test_localized_date_formatting(qapp, test_setup):
+    config, repository, lock_manager = test_setup
+    window = WriterWindow(config, repository, lock_manager)
+
+    # Test German formatting (e.g. 2026-10-13 -> Dienstag, 13. Oktober 2026)
+    formatted_de = window._format_date("2026-10-13", "de")
+    assert formatted_de == "Dienstag, 13. Oktober 2026"
+
+    # Test English formatting (e.g. 2026-10-13 -> Tuesday, October 13, 2026)
+    formatted_en = window._format_date("2026-10-13", "en")
+    assert formatted_en == "Tuesday, October 13, 2026"
+
+    # Test Portuguese fallback
+    formatted_pt = window._format_date("2026-10-13", "pt-BR")
+    assert formatted_pt == "Terça-feira, 13 de Outubro de 2026"
+
+    window.close()

@@ -31,6 +31,66 @@ LANGUAGE_NAMES = {
     "it": "Italiano (IT)",
 }
 
+DATE_LOCALIZATIONS = {
+    "de": {
+        "weekdays": ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"],
+        "months": [
+            "Januar", "Februar", "März", "April", "Mai", "Juni",
+            "Juli", "August", "September", "Oktober", "November", "Dezember",
+        ],
+        "format": lambda d, w, m: f"{w}, {d.day}. {m} {d.year}",
+    },
+    "en": {
+        "weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        "months": [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ],
+        "format": lambda d, w, m: f"{w}, {m} {d.day}, {d.year}",
+    },
+    "pt-BR": {
+        "weekdays": ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"],
+        "months": [
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+        ],
+        "format": lambda d, w, m: f"{w}, {d.day} de {m} de {d.year}",
+    },
+    "fr": {
+        "weekdays": ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"],
+        "months": [
+            "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+            "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+        ],
+        "format": lambda d, w, m: f"{w} {d.day} {m} {d.year}",
+    },
+    "es": {
+        "weekdays": ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"],
+        "months": [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+        ],
+        "format": lambda d, w, m: f"{w}, {d.day} de {m} de {d.year}",
+    },
+    "it": {
+        "weekdays": ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"],
+        "months": [
+            "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+            "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
+        ],
+        "format": lambda d, w, m: f"{w} {d.day} {m} {d.year}",
+    },
+}
+
+PLACEHOLDERS = {
+    "de": "Liebes Tagebuch... (Tinte auf Papier, ohne Korrekturen oder Ablenkungen)",
+    "en": "Dear Diary... (Ink on paper, zero distractions or corrections)",
+    "pt-BR": "Querido diário... (Tinta no papel, sem correções ou distrações)",
+    "fr": "Cher journal... (Encre sur papier, zéro distraction)",
+    "es": "Querido diario... (Tinta sobre papel, sin distracciones)",
+    "it": "Caro diario... (Inchiostro su carta, senza distrazioni)",
+}
+
 
 class WriterWindow(QMainWindow):
     def __init__(
@@ -158,16 +218,17 @@ class WriterWindow(QMainWindow):
         )
         self.setStyleSheet(stylesheet)
 
-    def _format_date(self, date_str: str) -> str:
+    def _format_date(self, date_str: str, lang_code: str = "de") -> str:
         try:
             d = datetime.strptime(date_str, "%Y-%m-%d").date()
-            # Format in friendly date representation
-            weekday_pt = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"][d.weekday()]
-            months_pt = [
-                "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-                "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-            ]
-            return f"{weekday_pt}, {d.day} de {months_pt[d.month - 1]} de {d.year}"
+            loc = (
+                DATE_LOCALIZATIONS.get(lang_code)
+                or DATE_LOCALIZATIONS.get(lang_code.split("-")[0])
+                or DATE_LOCALIZATIONS["en"]
+            )
+            weekday = loc["weekdays"][d.weekday()]
+            month = loc["months"][d.month - 1]
+            return loc["format"](d, weekday, month)
         except Exception:
             return date_str
 
@@ -176,10 +237,12 @@ class WriterWindow(QMainWindow):
         self.history_combo.clear()
         self.history_combo.addItem("Histórico de Páginas...", None)
 
-        entries = self.repository.list_entries(self.config.user.active_target_language, limit=30)
+        active_lang = self.config.user.active_target_language
+        entries = self.repository.list_entries(active_lang, limit=30)
         for ent in entries:
             status_symbol = "🔒" if ent.is_locked else "✏️"
-            label = f"{status_symbol} {ent.entry_date} ({ent.word_count} palavras)"
+            formatted_date = self._format_date(ent.entry_date, ent.target_language)
+            label = f"{status_symbol} {formatted_date} ({ent.word_count} palavras)"
             self.history_combo.addItem(label, ent.id)
 
         self.history_combo.blockSignals(False)
@@ -199,7 +262,14 @@ class WriterWindow(QMainWindow):
 
     def _update_ui_for_entry(self, entry: Entry) -> None:
         self._is_loading = True
-        self.date_label.setText(self._format_date(entry.entry_date))
+        self.date_label.setText(self._format_date(entry.entry_date, entry.target_language))
+
+        placeholder = (
+            PLACEHOLDERS.get(entry.target_language)
+            or PLACEHOLDERS.get(entry.target_language.split("-")[0])
+            or PLACEHOLDERS["en"]
+        )
+        self.editor.setPlaceholderText(placeholder)
 
         self.editor.setPlainText(entry.raw_text)
 

@@ -1,14 +1,16 @@
 user:
-  native_language: "pt-BR"
-  active_target_language: "de" # Idioma atual (ex: "de", "en")
-
+  native_language: pt-BR
+  active_target_language: de
+  available_languages:
+  - de
+  - en
 diary:
-  lock_policy: "daily_midnight" # Opções: "daily_midnight" (1 pág/dia, trava à 00:00) | "on_submit" (trava ao clicar em finalizar)
-  theme: "sepia"                # Opções: "sepia", "solarized_light", "paper_dark"
-  font_family: "Noto Serif"
+  lock_policy: daily_midnight
+  theme: sepia
+  font_family: Noto Serif
   font_size: 14
-
+  auto_save_delay_ms: 1000
 nlp:
-  run_on_lock: true             # Dispara a Fase 2 automaticamente em background assim que a entrada é travada
-  llm_provider: "ollama"        # Opções: "ollama", "openai", "anthropic", "gemini"
-  llm_model: "llama3.1:8b"
+  run_on_lock: true
+  llm_provider: ollama
+  llm_model: llama3.1:8b
