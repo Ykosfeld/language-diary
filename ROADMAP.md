@@ -131,9 +131,9 @@ CREATE INDEX idx_errors_lang_type ON error_logs(target_language, error_type);
 
 ### Fase 1: Interface de Escrita (O Diário) e Persistência Base
 
-- [ ] **Setup do Projeto e Banco:** Criar estrutura de diretórios, loader do `config.yaml` e inicialização do SQLite (`entries`, `error_logs`, `weekly_reports`).
-- [ ] **Design Minimalista (`PyQt6`/`PySide6`):** Janela limpa com estética de papel (Sépia/Solarized Light), tipografia serifada, cabeçalho discreto exibindo a data e seletor de idioma ativo.
-- [ ] **Gerenciador de Imutabilidade ("Tinta no Papel"):**
+- [x] **Setup do Projeto e Banco:** Criar estrutura de diretórios, loader do `config.yaml` e inicialização do SQLite (`entries`, `error_logs`, `weekly_reports`).
+- [x] **Design Minimalista (`PyQt6`/`PySide6`):** Janela limpa com estética de papel (Sépia/Solarized Light), tipografia serifada, cabeçalho discreto exibindo a data e seletor de idioma ativo.
+- [x] **Gerenciador de Imutabilidade ("Tinta no Papel"):**
       - Modo `daily_midnight`: Permite editar a página do dia atual (`status = 'DRAFT'`) com auto-save; na inicialização do app (ou virada de data), trava automaticamente páginas de dias anteriores (`status = 'LOCKED'`).
       - Modo `on_submit`: Botão "Finalizar Página" que trava imediatamente a entrada atual e permite abrir novas entradas no mesmo dia.
 

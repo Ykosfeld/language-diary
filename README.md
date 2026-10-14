@@ -24,7 +24,7 @@ language-diary/
 
 ## Fases de Desenvolvimento
 
-- [ ] **Fase 1:** Interface de Escrita (O Diário) e Persistência Base (SQLite & Imutabilidade)
+- [x] **Fase 1:** Interface de Escrita (O Diário) e Persistência Base (SQLite & Imutabilidade)
 - [ ] **Fase 2:** Motor Analítico Diário (GEC Local + spaCy Universal Dependencies)
 - [ ] **Fase 3:** A "Mesa do Professor" (Dashboard Semanal e Visualizador Micro)
 - [ ] **Fase 4:** Memória Longitudinal e RAG Estruturado
