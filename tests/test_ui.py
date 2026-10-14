@@ -109,3 +109,25 @@ def test_language_selector_switch(qapp, test_setup):
     assert window.current_entry.target_language == "en"
 
     window.close()
+
+
+def test_settings_dialog_flow(qapp, test_setup):
+    from src.ui.settings_dialog import SettingsDialog
+
+    config, repository, lock_manager = test_setup
+    dlg = SettingsDialog(config)
+
+    # Change theme, font size, and lock policy
+    idx_theme = dlg.theme_combo.findData("solarized_light")
+    dlg.theme_combo.setCurrentIndex(idx_theme)
+    dlg.font_size_spin.setValue(18)
+    idx_pol = dlg.policy_combo.findData("daily_midnight")
+    dlg.policy_combo.setCurrentIndex(idx_pol)
+
+    dlg._on_save()
+
+    assert config.diary.theme == "solarized_light"
+    assert config.diary.font_size == 18
+    assert config.diary.lock_policy == "daily_midnight"
+
+    dlg.close()

@@ -26,8 +26,10 @@ from src.ui.icons import (
     get_midnight_clock_icon,
     get_quill_idle_icon,
     get_quill_writing_icon,
+    get_settings_gear_icon,
     get_wax_seal_icon,
 )
+from src.ui.settings_dialog import SettingsDialog
 from src.ui.theme import generate_stylesheet, get_theme
 
 
@@ -195,22 +197,33 @@ class WriterWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         # 5. Bottom action: Finalize (on_submit) or Midnight indicator
-        if self.config.diary.lock_policy == "on_submit":
-            self.finalize_btn = QPushButton()
-            self.finalize_btn.setObjectName("FinalizeButton")
-            self.finalize_btn.setProperty("class", "IconButton")
-            self.finalize_btn.setIcon(get_wax_seal_icon(theme.accent, is_locked=False))
-            self.finalize_btn.setToolTip("Finalizar e selar página (tinta permanente)")
-            self.finalize_btn.clicked.connect(self._on_finalize_clicked)
-            sidebar_layout.addWidget(self.finalize_btn)
-        else:
-            self.policy_indicator = QPushButton()
-            self.policy_indicator.setObjectName("PolicyIndicator")
-            self.policy_indicator.setProperty("class", "IconButton")
-            self.policy_indicator.setEnabled(False)
-            self.policy_indicator.setIcon(get_midnight_clock_icon(theme.subtle_text))
-            self.policy_indicator.setToolTip("Esta página será selada à meia-noite")
-            sidebar_layout.addWidget(self.policy_indicator)
+        # 5. Bottom action: Finalize (on_submit) or Midnight indicator
+        self.finalize_btn = QPushButton()
+        self.finalize_btn.setObjectName("FinalizeButton")
+        self.finalize_btn.setProperty("class", "IconButton")
+        self.finalize_btn.setIcon(get_wax_seal_icon(theme.accent, is_locked=False))
+        self.finalize_btn.setToolTip("Finalizar e selar página (tinta permanente)")
+        self.finalize_btn.clicked.connect(self._on_finalize_clicked)
+        sidebar_layout.addWidget(self.finalize_btn)
+
+        self.policy_indicator = QPushButton()
+        self.policy_indicator.setObjectName("PolicyIndicator")
+        self.policy_indicator.setProperty("class", "IconButton")
+        self.policy_indicator.setEnabled(False)
+        self.policy_indicator.setIcon(get_midnight_clock_icon(theme.subtle_text))
+        self.policy_indicator.setToolTip("Esta página será selada à meia-noite")
+        sidebar_layout.addWidget(self.policy_indicator)
+
+        self._update_policy_button_visibility()
+
+        # 6. Settings Gear Button
+        self.settings_btn = QPushButton()
+        self.settings_btn.setObjectName("SettingsButton")
+        self.settings_btn.setProperty("class", "IconButton")
+        self.settings_btn.setIcon(get_settings_gear_icon(theme.subtle_text))
+        self.settings_btn.setToolTip("Configurações")
+        self.settings_btn.clicked.connect(self._open_settings_dialog)
+        sidebar_layout.addWidget(self.settings_btn)
 
         main_layout.addWidget(sidebar)
 
@@ -457,6 +470,29 @@ class WriterWindow(QMainWindow):
             if self.config.diary.lock_policy == "daily_midnight":
                 self.lock_manager.enforce_daily_lock(today)
                 self._load_active_entry()
+
+    def _update_policy_button_visibility(self) -> None:
+        is_submit_mode = (self.config.diary.lock_policy == "on_submit")
+        self.finalize_btn.setVisible(is_submit_mode)
+        self.policy_indicator.setVisible(not is_submit_mode)
+
+    def _open_settings_dialog(self) -> None:
+        if self.autosave_timer.isActive():
+            self.autosave_timer.stop()
+            self._perform_autosave()
+
+        dlg = SettingsDialog(self.config, self)
+        if dlg.exec():
+            # Dynamically refresh theme and all icon colors
+            self._apply_theme()
+            theme = get_theme(self.config.diary.theme)
+            self.settings_btn.setIcon(get_settings_gear_icon(theme.subtle_text))
+            self.history_btn.setIcon(get_book_history_icon(theme.subtle_text))
+            self.today_btn.setIcon(get_bookmark_today_icon(theme.accent))
+            self.policy_indicator.setIcon(get_midnight_clock_icon(theme.subtle_text))
+            self.paper_wax_seal.setPixmap(get_wax_seal_icon(theme.accent, is_locked=True, size=28).pixmap(28, 28))
+            self._update_policy_button_visibility()
+            self._load_active_entry()
 
     def closeEvent(self, event) -> None:
         if self.autosave_timer.isActive():

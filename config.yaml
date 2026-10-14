@@ -6,9 +6,9 @@ user:
   - en
 diary:
   lock_policy: daily_midnight
-  theme: sepia
+  theme: solarized_light
   font_family: Noto Serif
-  font_size: 14
+  font_size: 18
   auto_save_delay_ms: 1000
 nlp:
   run_on_lock: true

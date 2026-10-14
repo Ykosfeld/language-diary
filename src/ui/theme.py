@@ -186,6 +186,83 @@ def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> st
         background-color: {c.button_hover};
     }}
 
+    /* Dialogs & Forms */
+    QDialog {{
+        background-color: {c.window_bg};
+        color: {c.text};
+    }}
+
+    QGroupBox {{
+        color: {c.text};
+        font-family: {font_stack};
+        font-size: {max(font_size - 2, 11)}pt;
+        font-weight: 600;
+        border: 1px solid {c.border};
+        border-radius: 6px;
+        margin-top: 14px;
+        padding-top: 14px;
+        padding-bottom: 10px;
+        padding-left: 10px;
+        padding-right: 10px;
+    }}
+
+    QGroupBox::title {{
+        subcontrol-origin: margin;
+        subcontrol-position: top left;
+        left: 12px;
+        padding: 0 4px;
+        background-color: {c.window_bg};
+    }}
+
+    QLineEdit, QSpinBox, QComboBox {{
+        background-color: {c.card_bg};
+        color: {c.text};
+        font-family: {font_stack};
+        font-size: {max(font_size - 2, 11)}pt;
+        border: 1px solid {c.border};
+        border-radius: 4px;
+        padding: 5px 8px;
+        min-height: 22px;
+    }}
+
+    QLineEdit:focus, QSpinBox:focus, QComboBox:focus {{
+        border: 1px solid {c.accent};
+    }}
+
+    QComboBox::drop-down {{
+        border: none;
+        width: 20px;
+    }}
+
+    QCheckBox {{
+        color: {c.text};
+        font-family: {font_stack};
+        font-size: {max(font_size - 2, 11)}pt;
+    }}
+
+    QPushButton {{
+        background-color: {c.button_bg};
+        color: {c.button_text};
+        font-family: {font_stack};
+        font-size: {max(font_size - 2, 11)}pt;
+        border: 1px solid {c.border};
+        border-radius: 4px;
+        padding: 6px 14px;
+    }}
+
+    QPushButton:hover {{
+        background-color: {c.button_hover};
+    }}
+
+    QPushButton:pressed {{
+        background-color: {c.border};
+    }}
+
+    QPushButton:default {{
+        border: 1px solid {c.accent};
+        font-weight: 600;
+    }}
+
     /* Minimalist ScrollBar */
     QScrollBar:vertical {{
         background: {c.card_bg};
