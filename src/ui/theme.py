@@ -79,23 +79,23 @@ def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> st
         background-color: {c.window_bg};
     }}
 
-    /* Left Side Rail */
+    /* Ultra-Slim Left Side Rail */
     QFrame#SideBar {{
         background-color: transparent;
         border: none;
-        min-width: 44px;
-        max-width: 48px;
+        min-width: 26px;
+        max-width: 28px;
     }}
 
     QPushButton.IconButton {{
         background-color: transparent;
         border: 1px solid transparent;
-        border-radius: 8px;
-        padding: 6px;
-        min-width: 34px;
-        max-width: 34px;
-        min-height: 34px;
-        max-height: 34px;
+        border-radius: 4px;
+        padding: 3px;
+        min-width: 24px;
+        max-width: 24px;
+        min-height: 24px;
+        max-height: 24px;
     }}
 
     QPushButton.IconButton:hover {{
@@ -111,31 +111,29 @@ def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> st
         opacity: 0.35;
     }}
 
-    /* Compact Language Pills */
-    QPushButton.LangPill {{
+    /* Compact Language Selector Pill */
+    QPushButton.LangSelectorBtn {{
         background-color: transparent;
-        color: {c.subtle_text};
+        color: {c.text};
         font-family: {font_stack};
-        font-size: {max(font_size - 4, 9)}pt;
+        font-size: 8pt;
         font-weight: 700;
         border: 1px solid {c.border};
-        border-radius: 10px;
-        padding: 3px 2px;
-        min-width: 32px;
-        max-width: 32px;
-        min-height: 22px;
-        max-height: 22px;
+        border-radius: 4px;
+        padding: 2px 1px;
+        min-width: 24px;
+        max-width: 24px;
+        min-height: 20px;
+        max-height: 20px;
     }}
 
-    QPushButton.LangPill:hover {{
+    QPushButton.LangSelectorBtn:hover {{
         background-color: {c.button_hover};
-        color: {c.text};
+        border: 1px solid {c.accent};
     }}
 
-    QPushButton.LangPill[active="true"] {{
-        background-color: {c.accent};
-        color: {c.card_bg};
-        border: 1px solid {c.accent};
+    QPushButton.LangSelectorBtn:pressed {{
+        background-color: {c.button_bg};
     }}
 
     /* Paper Page Container */
@@ -168,7 +166,7 @@ def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> st
         selection-color: {c.text};
     }}
 
-    /* Popup Menus (e.g. History) */
+    /* Popup Menus (History, Language Selection) */
     QMenu {{
         background-color: {c.card_bg};
         color: {c.text};

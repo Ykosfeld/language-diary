@@ -92,3 +92,20 @@ def test_localized_date_formatting(qapp, test_setup):
     assert formatted_pt == "Terça-feira, 13 de Outubro de 2026"
 
     window.close()
+
+
+def test_language_selector_switch(qapp, test_setup):
+    config, repository, lock_manager = test_setup
+    config.user.active_target_language = "de"
+    window = WriterWindow(config, repository, lock_manager)
+
+    assert window.lang_btn.text() == "DE"
+
+    # Simulate choosing 'en'
+    window.config.user.active_target_language = "en"
+    window._load_active_entry()
+
+    assert window.lang_btn.text() == "EN"
+    assert window.current_entry.target_language == "en"
+
+    window.close()

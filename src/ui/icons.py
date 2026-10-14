@@ -16,27 +16,28 @@ def _svg_to_icon(svg_str: str, size: int = 24) -> QIcon:
 
 
 def get_quill_idle_icon(color: str, size: int = 24) -> QIcon:
-    """Resting fountain pen nib / quill representing saved state."""
+    """Resting pen representing saved / idle state."""
     svg = f"""
     <svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18"/>
-        <path d="M2 2l7.586 7.586"/>
-        <circle cx="11" cy="11" r="1" fill="{color}"/>
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        <line x1="15" y1="5" x2="18" y2="8"/>
+        <line x1="5" y1="17" x2="7" y2="19"/>
     </svg>
     """
     return _svg_to_icon(svg, size)
 
 
 def get_quill_writing_icon(color: str, ink_color: str, size: int = 24) -> QIcon:
-    """Tilted pen nib actively writing with an ink flow accent."""
+    """Active pen writing with ink flowing directly from the tip."""
     svg = f"""
     <svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18"/>
-        <path d="M2 2l7.586 7.586"/>
-        <circle cx="11" cy="11" r="1.5" fill="{ink_color}" stroke="{ink_color}"/>
-        <path d="M2 22c1-2 3-3 5-3" stroke="{ink_color}" stroke-width="2"/>
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        <line x1="15" y1="5" x2="18" y2="8"/>
+        <line x1="5" y1="17" x2="7" y2="19"/>
+        <!-- Fresh ink droplet at the nib tip -->
+        <circle cx="3" cy="20" r="2" fill="{ink_color}" stroke="{ink_color}"/>
+        <!-- Flowing ink stroke emerging from the tip -->
+        <path d="M3 20c4-1.2 6 1.2 10 0s4.5-1.2 8 0" stroke="{ink_color}" stroke-width="2.4" stroke-linecap="round"/>
     </svg>
     """
     return _svg_to_icon(svg, size)

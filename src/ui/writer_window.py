@@ -1,7 +1,7 @@
 """Minimalist writer window ('The Diary') adhering to zero-friction pedagogical principles."""
 
 from datetime import date, datetime
-from typing import Dict, Optional
+from typing import Optional
 from PyQt6.QtCore import QPoint, Qt, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
@@ -30,6 +30,15 @@ from src.ui.icons import (
 )
 from src.ui.theme import generate_stylesheet, get_theme
 
+
+LANGUAGE_NAMES = {
+    "de": "Alemão (DE)",
+    "en": "Inglês (EN)",
+    "pt-BR": "Português (PT)",
+    "fr": "Francês (FR)",
+    "es": "Espanhol (ES)",
+    "it": "Italiano (IT)",
+}
 
 DATE_LOCALIZATIONS = {
     "de": {
@@ -106,7 +115,6 @@ class WriterWindow(QMainWindow):
 
         self.current_entry: Optional[Entry] = None
         self._is_loading = False
-        self._lang_buttons: Dict[str, QPushButton] = {}
 
         # Autosave timer
         self.autosave_timer = QTimer(self)
@@ -125,8 +133,8 @@ class WriterWindow(QMainWindow):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("Diário de Idiomas")
-        self.resize(980, 800)
-        self.setMinimumSize(640, 500)
+        self.resize(960, 800)
+        self.setMinimumSize(600, 480)
 
         # Central widget and horizontal layout
         central_widget = QWidget(self)
@@ -134,20 +142,20 @@ class WriterWindow(QMainWindow):
         self.setCentralWidget(central_widget)
 
         main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(20, 24, 32, 28)
-        main_layout.setSpacing(18)
+        main_layout.setContentsMargins(10, 20, 28, 24)
+        main_layout.setSpacing(10)
 
-        # --- Left Side Rail (Dock) ---
+        # --- Ultra-Slim Left Side Rail (Dock) ---
         sidebar = QFrame()
         sidebar.setObjectName("SideBar")
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(0, 8, 0, 8)
-        sidebar_layout.setSpacing(14)
+        sidebar_layout.setContentsMargins(0, 4, 0, 4)
+        sidebar_layout.setSpacing(10)
         sidebar_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
         theme = get_theme(self.config.diary.theme)
 
-        # 1. Status / Ink Icon (top)
+        # 1. Status / Ink Pen Icon (top)
         self.status_icon_btn = QPushButton()
         self.status_icon_btn.setObjectName("StatusIconButton")
         self.status_icon_btn.setProperty("class", "IconButton")
@@ -155,7 +163,16 @@ class WriterWindow(QMainWindow):
         self.status_icon_btn.setToolTip("Tudo salvo na página")
         sidebar_layout.addWidget(self.status_icon_btn)
 
-        # 2. History Button (Notebook icon)
+        # 2. Language Selector Button (Single compact button showing current target language)
+        active_lang = self.config.user.active_target_language
+        self.lang_btn = QPushButton(active_lang.upper())
+        self.lang_btn.setObjectName("LangSelectorBtn")
+        self.lang_btn.setProperty("class", "LangSelectorBtn")
+        self.lang_btn.setToolTip(f"Idioma ativo: {active_lang.upper()} (Clique para alternar)")
+        self.lang_btn.clicked.connect(self._open_language_menu)
+        sidebar_layout.addWidget(self.lang_btn)
+
+        # 3. History Button (Notebook icon)
         self.history_btn = QPushButton()
         self.history_btn.setObjectName("HistoryButton")
         self.history_btn.setProperty("class", "IconButton")
@@ -164,7 +181,7 @@ class WriterWindow(QMainWindow):
         self.history_btn.clicked.connect(self._open_history_menu)
         sidebar_layout.addWidget(self.history_btn)
 
-        # 3. Return to Today Bookmark (only visible on past entries)
+        # 4. Return to Today Bookmark (only visible on past entries)
         self.today_btn = QPushButton()
         self.today_btn.setObjectName("TodayBookmarkButton")
         self.today_btn.setProperty("class", "IconButton")
@@ -173,23 +190,6 @@ class WriterWindow(QMainWindow):
         self.today_btn.clicked.connect(self._on_today_clicked)
         self.today_btn.setVisible(False)
         sidebar_layout.addWidget(self.today_btn)
-
-        # 4. Language Pills (Vertical)
-        lang_container = QVBoxLayout()
-        lang_container.setSpacing(6)
-        lang_container.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-
-        for lang_code in self.config.user.available_languages:
-            pill = QPushButton(lang_code.upper())
-            pill.setProperty("class", "LangPill")
-            is_active = (lang_code == self.config.user.active_target_language)
-            pill.setProperty("active", "true" if is_active else "false")
-            pill.setToolTip(f"Escrever em {lang_code.upper()}")
-            pill.clicked.connect(lambda _, l=lang_code: self._on_language_pill_clicked(l))
-            self._lang_buttons[lang_code] = pill
-            lang_container.addWidget(pill)
-
-        sidebar_layout.addLayout(lang_container)
 
         # Push bottom controls down
         sidebar_layout.addStretch()
@@ -218,7 +218,7 @@ class WriterWindow(QMainWindow):
         paper_frame = QFrame()
         paper_frame.setObjectName("PaperContainer")
         paper_layout = QVBoxLayout(paper_frame)
-        paper_layout.setContentsMargins(48, 36, 48, 40)
+        paper_layout.setContentsMargins(44, 34, 44, 38)
         paper_layout.setSpacing(16)
 
         # Paper Header Row: Clean Date Label + Discreet Wax Seal (when locked)
@@ -281,16 +281,12 @@ class WriterWindow(QMainWindow):
         # Enforce lock policies and retrieve or create current entry
         self.current_entry = self.lock_manager.get_current_entry(lang, today)
 
+        self.lang_btn.setText(lang.upper())
+        self.lang_btn.setToolTip(f"Idioma ativo: {lang.upper()} (Clique para alternar)")
+
         self._update_ui_for_entry(self.current_entry)
-        self._update_language_pills(lang)
         self.today_btn.setVisible(False)
         self._is_loading = False
-
-    def _update_language_pills(self, active_lang: str) -> None:
-        for code, pill in self._lang_buttons.items():
-            pill.setProperty("active", "true" if code == active_lang else "false")
-            pill.style().unpolish(pill)
-            pill.style().polish(pill)
 
     def _update_ui_for_entry(self, entry: Entry) -> None:
         self._is_loading = True
@@ -338,7 +334,7 @@ class WriterWindow(QMainWindow):
             return
 
         theme = get_theme(self.config.diary.theme)
-        # Visual writing feedback: active pen with fresh ink
+        # Visual writing feedback: active pen with fresh ink droplet and line flowing from tip
         self.status_icon_btn.setIcon(get_quill_writing_icon(theme.text, theme.accent))
         self.status_icon_btn.setToolTip("Salvando tinta no papel...")
 
@@ -366,21 +362,30 @@ class WriterWindow(QMainWindow):
             self.editor.setReadOnly(True)
             self.paper_wax_seal.setVisible(True)
 
-    def _on_language_pill_clicked(self, new_lang: str) -> None:
-        if new_lang == self.config.user.active_target_language:
-            return
-
-        # Flush autosave first
+    def _open_language_menu(self) -> None:
         if self.autosave_timer.isActive():
             self.autosave_timer.stop()
             self._perform_autosave()
 
-        self.config.user.active_target_language = new_lang
-        save_config(self.config)
-        self._load_active_entry()
+        menu = QMenu(self)
+        current_lang = self.config.user.active_target_language
+
+        for code in self.config.user.available_languages:
+            name = LANGUAGE_NAMES.get(code, code.upper())
+            prefix = "✓ " if code == current_lang else "   "
+            action = menu.addAction(f"{prefix}{name}")
+            action.setData(code)
+
+        pos = self.lang_btn.mapToGlobal(QPoint(self.lang_btn.width() + 6, 0))
+        selected = menu.exec(pos)
+        if selected and selected.data():
+            chosen_lang = selected.data()
+            if chosen_lang != current_lang:
+                self.config.user.active_target_language = chosen_lang
+                save_config(self.config)
+                self._load_active_entry()
 
     def _open_history_menu(self) -> None:
-        # Flush autosave before opening history
         if self.autosave_timer.isActive():
             self.autosave_timer.stop()
             self._perform_autosave()
@@ -401,7 +406,6 @@ class WriterWindow(QMainWindow):
                 action = menu.addAction(action_text)
                 action.setData(ent.id)
 
-        # Position menu next to history button
         pos = self.history_btn.mapToGlobal(QPoint(self.history_btn.width() + 6, 0))
         selected_action = menu.exec(pos)
 
