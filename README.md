@@ -28,3 +28,6 @@ language-diary/
 - [ ] **Fase 2:** Motor Analítico Diário (GEC Local + spaCy Universal Dependencies)
 - [ ] **Fase 3:** A "Mesa do Professor" (Dashboard Semanal e Visualizador Micro)
 - [ ] **Fase 4:** Memória Longitudinal e RAG Estruturado
+
+Para especificações detalhadas de contratos de dados (DDL do SQLite, tags XML `<err>`, esquemas), guardrails arquiteturais e contexto completo, consulte o [ROADMAP.md](ROADMAP.md).
+
