@@ -1,14 +1,15 @@
 """Minimalist writer window ('The Diary') adhering to zero-friction pedagogical principles."""
 
 from datetime import date, datetime
-from typing import Optional
-from PyQt6.QtCore import QDate, Qt, QTimer
+from typing import Dict, Optional
+from PyQt6.QtCore import QPoint, Qt, QTimer
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
-    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -19,17 +20,16 @@ from PyQt6.QtWidgets import (
 from src.core.config import AppConfig, save_config
 from src.core.database import Entry, EntryRepository
 from src.core.lock_manager import LockManager
-from src.ui.theme import generate_stylesheet
+from src.ui.icons import (
+    get_book_history_icon,
+    get_bookmark_today_icon,
+    get_midnight_clock_icon,
+    get_quill_idle_icon,
+    get_quill_writing_icon,
+    get_wax_seal_icon,
+)
+from src.ui.theme import generate_stylesheet, get_theme
 
-
-LANGUAGE_NAMES = {
-    "de": "Alemão (DE)",
-    "en": "Inglês (EN)",
-    "pt-BR": "Português (PT)",
-    "fr": "Francês (FR)",
-    "es": "Espanhol (ES)",
-    "it": "Italiano (IT)",
-}
 
 DATE_LOCALIZATIONS = {
     "de": {
@@ -68,7 +68,7 @@ DATE_LOCALIZATIONS = {
         "weekdays": ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"],
         "months": [
             "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+            "Julho", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
         ],
         "format": lambda d, w, m: f"{w}, {d.day} de {m} de {d.year}",
     },
@@ -106,6 +106,7 @@ class WriterWindow(QMainWindow):
 
         self.current_entry: Optional[Entry] = None
         self._is_loading = False
+        self._lang_buttons: Dict[str, QPushButton] = {}
 
         # Autosave timer
         self.autosave_timer = QTimer(self)
@@ -124,89 +125,129 @@ class WriterWindow(QMainWindow):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("Diário de Idiomas")
-        self.resize(960, 780)
+        self.resize(980, 800)
         self.setMinimumSize(640, 500)
 
-        # Central widget and layout
+        # Central widget and horizontal layout
         central_widget = QWidget(self)
         central_widget.setObjectName("CentralWidget")
         self.setCentralWidget(central_widget)
 
-        root_layout = QVBoxLayout(central_widget)
-        root_layout.setContentsMargins(40, 24, 40, 32)
-        root_layout.setSpacing(16)
+        main_layout = QHBoxLayout(central_widget)
+        main_layout.setContentsMargins(20, 24, 32, 28)
+        main_layout.setSpacing(18)
 
-        # --- Top Header Bar ---
-        header_layout = QHBoxLayout()
-        header_layout.setSpacing(16)
+        # --- Left Side Rail (Dock) ---
+        sidebar = QFrame()
+        sidebar.setObjectName("SideBar")
+        sidebar_layout = QVBoxLayout(sidebar)
+        sidebar_layout.setContentsMargins(0, 8, 0, 8)
+        sidebar_layout.setSpacing(14)
+        sidebar_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
-        # Left header: Date and status
-        date_box = QVBoxLayout()
-        date_box.setSpacing(2)
+        theme = get_theme(self.config.diary.theme)
 
-        self.date_label = QLabel()
-        self.date_label.setObjectName("DateLabel")
-        date_box.addWidget(self.date_label)
+        # 1. Status / Ink Icon (top)
+        self.status_icon_btn = QPushButton()
+        self.status_icon_btn.setObjectName("StatusIconButton")
+        self.status_icon_btn.setProperty("class", "IconButton")
+        self.status_icon_btn.setIcon(get_quill_idle_icon(theme.subtle_text))
+        self.status_icon_btn.setToolTip("Tudo salvo na página")
+        sidebar_layout.addWidget(self.status_icon_btn)
 
-        self.status_label = QLabel("Salvo")
-        self.status_label.setObjectName("StatusLabel")
-        date_box.addWidget(self.status_label)
+        # 2. History Button (Notebook icon)
+        self.history_btn = QPushButton()
+        self.history_btn.setObjectName("HistoryButton")
+        self.history_btn.setProperty("class", "IconButton")
+        self.history_btn.setIcon(get_book_history_icon(theme.subtle_text))
+        self.history_btn.setToolTip("Páginas Anteriores")
+        self.history_btn.clicked.connect(self._open_history_menu)
+        sidebar_layout.addWidget(self.history_btn)
 
-        header_layout.addLayout(date_box)
-        header_layout.addStretch()
-
-        # Right header: History, Language selector, Finalize button
-        self.today_btn = QPushButton("Página de Hoje")
+        # 3. Return to Today Bookmark (only visible on past entries)
+        self.today_btn = QPushButton()
+        self.today_btn.setObjectName("TodayBookmarkButton")
+        self.today_btn.setProperty("class", "IconButton")
+        self.today_btn.setIcon(get_bookmark_today_icon(theme.accent))
+        self.today_btn.setToolTip("Voltar para a página de hoje")
         self.today_btn.clicked.connect(self._on_today_clicked)
         self.today_btn.setVisible(False)
-        header_layout.addWidget(self.today_btn)
+        sidebar_layout.addWidget(self.today_btn)
 
-        self.history_combo = QComboBox()
-        self.history_combo.setToolTip("Páginas Anteriores")
-        self.history_combo.currentIndexChanged.connect(self._on_history_selected)
-        header_layout.addWidget(self.history_combo)
+        # 4. Language Pills (Vertical)
+        lang_container = QVBoxLayout()
+        lang_container.setSpacing(6)
+        lang_container.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
-        self.lang_combo = QComboBox()
         for lang_code in self.config.user.available_languages:
-            display_name = LANGUAGE_NAMES.get(lang_code, lang_code.upper())
-            self.lang_combo.addItem(display_name, lang_code)
+            pill = QPushButton(lang_code.upper())
+            pill.setProperty("class", "LangPill")
+            is_active = (lang_code == self.config.user.active_target_language)
+            pill.setProperty("active", "true" if is_active else "false")
+            pill.setToolTip(f"Escrever em {lang_code.upper()}")
+            pill.clicked.connect(lambda _, l=lang_code: self._on_language_pill_clicked(l))
+            self._lang_buttons[lang_code] = pill
+            lang_container.addWidget(pill)
 
-        # Set active language
-        active_idx = self.lang_combo.findData(self.config.user.active_target_language)
-        if active_idx >= 0:
-            self.lang_combo.setCurrentIndex(active_idx)
-        self.lang_combo.currentIndexChanged.connect(self._on_language_changed)
-        header_layout.addWidget(self.lang_combo)
+        sidebar_layout.addLayout(lang_container)
 
-        # Finalize button (only in on_submit mode)
-        self.finalize_btn = QPushButton("Finalizar Página")
-        self.finalize_btn.setObjectName("FinalizeButton")
-        self.finalize_btn.clicked.connect(self._on_finalize_clicked)
-        if self.config.diary.lock_policy != "on_submit":
-            self.finalize_btn.setVisible(False)
-        header_layout.addWidget(self.finalize_btn)
+        # Push bottom controls down
+        sidebar_layout.addStretch()
 
-        root_layout.addLayout(header_layout)
+        # 5. Bottom action: Finalize (on_submit) or Midnight indicator
+        if self.config.diary.lock_policy == "on_submit":
+            self.finalize_btn = QPushButton()
+            self.finalize_btn.setObjectName("FinalizeButton")
+            self.finalize_btn.setProperty("class", "IconButton")
+            self.finalize_btn.setIcon(get_wax_seal_icon(theme.accent, is_locked=False))
+            self.finalize_btn.setToolTip("Finalizar e selar página (tinta permanente)")
+            self.finalize_btn.clicked.connect(self._on_finalize_clicked)
+            sidebar_layout.addWidget(self.finalize_btn)
+        else:
+            self.policy_indicator = QPushButton()
+            self.policy_indicator.setObjectName("PolicyIndicator")
+            self.policy_indicator.setProperty("class", "IconButton")
+            self.policy_indicator.setEnabled(False)
+            self.policy_indicator.setIcon(get_midnight_clock_icon(theme.subtle_text))
+            self.policy_indicator.setToolTip("Esta página será selada à meia-noite")
+            sidebar_layout.addWidget(self.policy_indicator)
 
-        # --- Locked Banner (Hidden by default) ---
-        self.locked_banner = QLabel("🔒 Página selada. O texto é imutável e não pode ser editado.")
-        self.locked_banner.setObjectName("LockedBanner")
-        self.locked_banner.setVisible(False)
-        root_layout.addWidget(self.locked_banner)
+        main_layout.addWidget(sidebar)
 
-        # --- Paper Sheet Container ---
+        # --- Right Paper Page Container ---
         paper_frame = QFrame()
         paper_frame.setObjectName("PaperContainer")
         paper_layout = QVBoxLayout(paper_frame)
-        paper_layout.setContentsMargins(36, 32, 36, 32)
+        paper_layout.setContentsMargins(48, 36, 48, 40)
+        paper_layout.setSpacing(16)
 
+        # Paper Header Row: Clean Date Label + Discreet Wax Seal (when locked)
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 8)
+
+        self.date_label = QLabel()
+        self.date_label.setObjectName("DateLabel")
+        header_row.addWidget(self.date_label)
+
+        header_row.addStretch()
+
+        # Wax seal watermark / stamp on the paper when locked
+        self.paper_wax_seal = QLabel()
+        self.paper_wax_seal.setObjectName("PaperWaxSeal")
+        self.paper_wax_seal.setPixmap(get_wax_seal_icon(theme.accent, is_locked=True, size=28).pixmap(28, 28))
+        self.paper_wax_seal.setToolTip("Página selada. O texto é imutável.")
+        self.paper_wax_seal.setVisible(False)
+        header_row.addWidget(self.paper_wax_seal)
+
+        paper_layout.addLayout(header_row)
+
+        # The Writing Area (Pure Paper)
         self.editor = QPlainTextEdit()
         self.editor.setObjectName("DiaryEditor")
-        self.editor.setPlaceholderText("Escreva livremente aqui... (tinta no papel, sem correções ou distrações)")
         self.editor.textChanged.connect(self._on_text_changed)
+        paper_layout.addWidget(self.editor, 1)
 
-        paper_layout.addWidget(self.editor)
-        root_layout.addWidget(paper_frame, 1)
+        main_layout.addWidget(paper_frame, 1)
 
         self._apply_theme()
 
@@ -232,21 +273,6 @@ class WriterWindow(QMainWindow):
         except Exception:
             return date_str
 
-    def _refresh_history_combo(self) -> None:
-        self.history_combo.blockSignals(True)
-        self.history_combo.clear()
-        self.history_combo.addItem("Histórico de Páginas...", None)
-
-        active_lang = self.config.user.active_target_language
-        entries = self.repository.list_entries(active_lang, limit=30)
-        for ent in entries:
-            status_symbol = "🔒" if ent.is_locked else "✏️"
-            formatted_date = self._format_date(ent.entry_date, ent.target_language)
-            label = f"{status_symbol} {formatted_date} ({ent.word_count} palavras)"
-            self.history_combo.addItem(label, ent.id)
-
-        self.history_combo.blockSignals(False)
-
     def _load_active_entry(self) -> None:
         self._is_loading = True
         lang = self.config.user.active_target_language
@@ -256,35 +282,51 @@ class WriterWindow(QMainWindow):
         self.current_entry = self.lock_manager.get_current_entry(lang, today)
 
         self._update_ui_for_entry(self.current_entry)
-        self._refresh_history_combo()
+        self._update_language_pills(lang)
         self.today_btn.setVisible(False)
         self._is_loading = False
 
+    def _update_language_pills(self, active_lang: str) -> None:
+        for code, pill in self._lang_buttons.items():
+            pill.setProperty("active", "true" if code == active_lang else "false")
+            pill.style().unpolish(pill)
+            pill.style().polish(pill)
+
     def _update_ui_for_entry(self, entry: Entry) -> None:
         self._is_loading = True
+        theme = get_theme(self.config.diary.theme)
+
+        # Date header
         self.date_label.setText(self._format_date(entry.entry_date, entry.target_language))
 
+        # Dynamic placeholder in target language
         placeholder = (
             PLACEHOLDERS.get(entry.target_language)
             or PLACEHOLDERS.get(entry.target_language.split("-")[0])
             or PLACEHOLDERS["en"]
         )
         self.editor.setPlaceholderText(placeholder)
-
         self.editor.setPlainText(entry.raw_text)
 
         is_editable = self.lock_manager.is_editable(entry)
         self.editor.setReadOnly(not is_editable)
-        self.locked_banner.setVisible(not is_editable)
 
+        # Paper wax seal stamp
+        self.paper_wax_seal.setVisible(not is_editable)
+
+        # Update sidebar status icon
         if is_editable:
-            self.status_label.setText("Rascunho (Salvo)")
-            if self.config.diary.lock_policy == "on_submit":
+            self.status_icon_btn.setIcon(get_quill_idle_icon(theme.subtle_text))
+            self.status_icon_btn.setToolTip("Tudo salvo na página")
+            if hasattr(self, "finalize_btn"):
                 self.finalize_btn.setEnabled(len(entry.raw_text.strip()) > 0)
-                self.finalize_btn.setVisible(True)
+                self.finalize_btn.setIcon(get_wax_seal_icon(theme.accent, is_locked=False))
         else:
-            self.status_label.setText("Página Selada (Leitura)")
-            self.finalize_btn.setEnabled(False)
+            self.status_icon_btn.setIcon(get_wax_seal_icon(theme.subtle_text, is_locked=True))
+            self.status_icon_btn.setToolTip("Página selada (somente leitura)")
+            if hasattr(self, "finalize_btn"):
+                self.finalize_btn.setEnabled(False)
+                self.finalize_btn.setIcon(get_wax_seal_icon(theme.subtle_text, is_locked=True))
 
         self._is_loading = False
 
@@ -295,32 +337,40 @@ class WriterWindow(QMainWindow):
         if not self.current_entry or self.editor.isReadOnly():
             return
 
-        self.status_label.setText("Salvando...")
-        if self.config.diary.lock_policy == "on_submit":
+        theme = get_theme(self.config.diary.theme)
+        # Visual writing feedback: active pen with fresh ink
+        self.status_icon_btn.setIcon(get_quill_writing_icon(theme.text, theme.accent))
+        self.status_icon_btn.setToolTip("Salvando tinta no papel...")
+
+        if hasattr(self, "finalize_btn"):
             self.finalize_btn.setEnabled(len(self.editor.toPlainText().strip()) > 0)
+
         self.autosave_timer.start()
 
     def _perform_autosave(self) -> None:
         if not self.current_entry or self.editor.isReadOnly():
             return
 
+        theme = get_theme(self.config.diary.theme)
         raw_text = self.editor.toPlainText()
         saved = self.repository.update_raw_text(self.current_entry.id, raw_text)
+
         if saved:
-            self.status_label.setText("Salvo")
+            self.status_icon_btn.setIcon(get_quill_idle_icon(theme.subtle_text))
+            self.status_icon_btn.setToolTip("Tudo salvo na página")
             self.current_entry.raw_text = raw_text
         else:
-            # Entry could not be updated because it's locked
-            self.status_label.setText("Não editável (Bloqueado)")
+            # Locked entry
+            self.status_icon_btn.setIcon(get_wax_seal_icon(theme.subtle_text, is_locked=True))
+            self.status_icon_btn.setToolTip("Página selada (imutável)")
             self.editor.setReadOnly(True)
-            self.locked_banner.setVisible(True)
+            self.paper_wax_seal.setVisible(True)
 
-    def _on_language_changed(self, index: int) -> None:
-        new_lang = self.lang_combo.itemData(index)
-        if not new_lang or new_lang == self.config.user.active_target_language:
+    def _on_language_pill_clicked(self, new_lang: str) -> None:
+        if new_lang == self.config.user.active_target_language:
             return
 
-        # Flush any pending autosave
+        # Flush autosave first
         if self.autosave_timer.isActive():
             self.autosave_timer.stop()
             self._perform_autosave()
@@ -329,21 +379,63 @@ class WriterWindow(QMainWindow):
         save_config(self.config)
         self._load_active_entry()
 
+    def _open_history_menu(self) -> None:
+        # Flush autosave before opening history
+        if self.autosave_timer.isActive():
+            self.autosave_timer.stop()
+            self._perform_autosave()
+
+        active_lang = self.config.user.active_target_language
+        entries = self.repository.list_entries(active_lang, limit=30)
+
+        menu = QMenu(self)
+        if not entries:
+            empty_action = QAction("Nenhuma página anterior", self)
+            empty_action.setEnabled(False)
+            menu.addAction(empty_action)
+        else:
+            for ent in entries:
+                status_icon = "🔒" if ent.is_locked else "✏️"
+                date_fmt = self._format_date(ent.entry_date, ent.target_language)
+                action_text = f"{status_icon} {date_fmt} ({ent.word_count} palavras)"
+                action = menu.addAction(action_text)
+                action.setData(ent.id)
+
+        # Position menu next to history button
+        pos = self.history_btn.mapToGlobal(QPoint(self.history_btn.width() + 6, 0))
+        selected_action = menu.exec(pos)
+
+        if selected_action and selected_action.data() is not None:
+            entry_id = selected_action.data()
+            selected_entry = self.repository.get_by_id(entry_id)
+            if selected_entry:
+                self.current_entry = selected_entry
+                self._update_ui_for_entry(selected_entry)
+                today = date.today().isoformat()
+                self.today_btn.setVisible(
+                    selected_entry.entry_date != today or selected_entry.is_locked
+                )
+
+    def _on_today_clicked(self) -> None:
+        if self.autosave_timer.isActive():
+            self.autosave_timer.stop()
+            self._perform_autosave()
+
+        self._load_active_entry()
+
     def _on_finalize_clicked(self) -> None:
         if not self.current_entry or self.current_entry.is_locked:
             return
 
-        # Flush autosave first
         if self.autosave_timer.isActive():
             self.autosave_timer.stop()
             self._perform_autosave()
 
         confirm = QMessageBox.question(
             self,
-            "Finalizar Página",
-            "Deseja finalizar e selar esta página?\n\n"
-            "Uma vez selada, o texto se tornará imutável (tinta no papel) "
-            "e ficará disponível para a análise do professor.",
+            "Selar Página",
+            "Deseja selar esta página?\n\n"
+            "Uma vez selada, a tinta se torna permanente e o texto imutável.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -354,38 +446,8 @@ class WriterWindow(QMainWindow):
                 self.current_entry = self.repository.get_by_id(self.current_entry.id)
                 if self.current_entry:
                     self._update_ui_for_entry(self.current_entry)
-                self._refresh_history_combo()
-
-    def _on_history_selected(self, index: int) -> None:
-        if self._is_loading:
-            return
-
-        entry_id = self.history_combo.itemData(index)
-        if entry_id is None:
-            return
-
-        # Flush current entry autosave
-        if self.autosave_timer.isActive():
-            self.autosave_timer.stop()
-            self._perform_autosave()
-
-        selected_entry = self.repository.get_by_id(entry_id)
-        if selected_entry:
-            self.current_entry = selected_entry
-            self._update_ui_for_entry(selected_entry)
-            today = date.today().isoformat()
-            self.today_btn.setVisible(selected_entry.entry_date != today or selected_entry.is_locked)
-
-    def _on_today_clicked(self) -> None:
-        # Flush current entry autosave
-        if self.autosave_timer.isActive():
-            self.autosave_timer.stop()
-            self._perform_autosave()
-
-        self._load_active_entry()
 
     def _check_midnight_rollover(self) -> None:
-        """Periodic check in case the day changes while the app is running."""
         today = date.today().isoformat()
         if self.current_entry and self.current_entry.entry_date != today:
             if self.config.diary.lock_policy == "daily_midnight":
@@ -393,7 +455,6 @@ class WriterWindow(QMainWindow):
                 self._load_active_entry()
 
     def closeEvent(self, event) -> None:
-        # Guarantee autosave on window close
         if self.autosave_timer.isActive():
             self.autosave_timer.stop()
             self._perform_autosave()

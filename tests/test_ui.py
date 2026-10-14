@@ -69,8 +69,8 @@ def test_writer_window_locked_entry_read_only(qapp, test_setup):
 
     window.show()
     assert window.editor.isReadOnly() is True
-    assert not window.locked_banner.isHidden()
-    assert "Selada" in window.status_label.text()
+    assert not window.paper_wax_seal.isHidden()
+    assert "selada" in window.status_icon_btn.toolTip().lower()
 
     window.close()
 

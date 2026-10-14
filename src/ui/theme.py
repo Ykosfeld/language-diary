@@ -21,7 +21,7 @@ class ThemeColors:
 
 THEMES: Dict[str, ThemeColors] = {
     "sepia": ThemeColors(
-        window_bg="#f4ecd8",
+        window_bg="#f0e6cf",
         card_bg="#fbf6eb",
         text="#3d312a",
         subtle_text="#8c7e72",
@@ -34,7 +34,7 @@ THEMES: Dict[str, ThemeColors] = {
         status_dot_locked="#a35745",
     ),
     "solarized_light": ThemeColors(
-        window_bg="#eee8d5",
+        window_bg="#e8e0cb",
         card_bg="#fdf6e3",
         text="#657b83",
         subtle_text="#93a1a1",
@@ -47,14 +47,14 @@ THEMES: Dict[str, ThemeColors] = {
         status_dot_locked="#cb4b16",
     ),
     "paper_dark": ThemeColors(
-        window_bg="#191919",
-        card_bg="#242424",
+        window_bg="#181818",
+        card_bg="#222222",
         text="#d6d6d6",
         subtle_text="#858585",
-        border="#383838",
+        border="#363636",
         accent="#4ec9b0",
-        button_bg="#2f2f2f",
-        button_hover="#3c3c3c",
+        button_bg="#2a2a2a",
+        button_hover="#383838",
         button_text="#e0e0e0",
         status_dot_draft="#4ec9b0",
         status_dot_locked="#e06c75",
@@ -79,77 +79,82 @@ def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> st
         background-color: {c.window_bg};
     }}
 
+    /* Left Side Rail */
+    QFrame#SideBar {{
+        background-color: transparent;
+        border: none;
+        min-width: 44px;
+        max-width: 48px;
+    }}
+
+    QPushButton.IconButton {{
+        background-color: transparent;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 6px;
+        min-width: 34px;
+        max-width: 34px;
+        min-height: 34px;
+        max-height: 34px;
+    }}
+
+    QPushButton.IconButton:hover {{
+        background-color: {c.button_hover};
+        border: 1px solid {c.border};
+    }}
+
+    QPushButton.IconButton:pressed {{
+        background-color: {c.button_bg};
+    }}
+
+    QPushButton.IconButton:disabled {{
+        opacity: 0.35;
+    }}
+
+    /* Compact Language Pills */
+    QPushButton.LangPill {{
+        background-color: transparent;
+        color: {c.subtle_text};
+        font-family: {font_stack};
+        font-size: {max(font_size - 4, 9)}pt;
+        font-weight: 700;
+        border: 1px solid {c.border};
+        border-radius: 10px;
+        padding: 3px 2px;
+        min-width: 32px;
+        max-width: 32px;
+        min-height: 22px;
+        max-height: 22px;
+    }}
+
+    QPushButton.LangPill:hover {{
+        background-color: {c.button_hover};
+        color: {c.text};
+    }}
+
+    QPushButton.LangPill[active="true"] {{
+        background-color: {c.accent};
+        color: {c.card_bg};
+        border: 1px solid {c.accent};
+    }}
+
+    /* Paper Page Container */
     QFrame#PaperContainer {{
         background-color: {c.card_bg};
         border: 1px solid {c.border};
-        border-radius: 8px;
+        border-radius: 6px;
     }}
 
     QLabel#DateLabel {{
         color: {c.text};
         font-family: {font_stack};
-        font-size: {font_size + 2}pt;
+        font-size: {font_size + 4}pt;
         font-weight: 600;
+        background: transparent;
     }}
 
-    QLabel#StatusLabel {{
-        color: {c.subtle_text};
-        font-family: {font_stack};
-        font-size: {max(font_size - 3, 10)}pt;
-    }}
-
-    QLabel#LockedBanner {{
-        background-color: {c.button_bg};
-        color: {c.subtle_text};
-        font-family: {font_stack};
-        font-size: {max(font_size - 2, 11)}pt;
-        font-style: italic;
-        padding: 6px 12px;
-        border-radius: 4px;
-        border: 1px dashed {c.border};
-    }}
-
-    QComboBox {{
-        background-color: {c.button_bg};
-        color: {c.button_text};
-        font-family: {font_stack};
-        font-size: {max(font_size - 2, 11)}pt;
-        border: 1px solid {c.border};
-        border-radius: 4px;
-        padding: 4px 10px;
-        min-width: 70px;
-    }}
-
-    QComboBox:hover {{
-        background-color: {c.button_hover};
-    }}
-
-    QComboBox::drop-down {{
-        border: 0px;
-    }}
-
-    QPushButton {{
-        background-color: {c.button_bg};
-        color: {c.button_text};
-        font-family: {font_stack};
-        font-size: {max(font_size - 2, 11)}pt;
-        border: 1px solid {c.border};
-        border-radius: 4px;
-        padding: 5px 12px;
-    }}
-
-    QPushButton:hover {{
-        background-color: {c.button_hover};
-    }}
-
-    QPushButton:disabled {{
-        opacity: 0.5;
-        color: {c.subtle_text};
-    }}
-
-    QPushButton#FinalizeButton {{
-        border: 1px solid {c.accent};
-        font-weight: 500;
+    QLabel#PaperWaxSeal {{
+        background: transparent;
     }}
 
     QPlainTextEdit#DiaryEditor {{
@@ -163,16 +168,37 @@ def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> st
         selection-color: {c.text};
     }}
 
+    /* Popup Menus (e.g. History) */
+    QMenu {{
+        background-color: {c.card_bg};
+        color: {c.text};
+        border: 1px solid {c.border};
+        border-radius: 6px;
+        padding: 6px;
+        font-family: {font_stack};
+        font-size: {max(font_size - 2, 11)}pt;
+    }}
+
+    QMenu::item {{
+        padding: 6px 18px;
+        border-radius: 4px;
+    }}
+
+    QMenu::item:selected {{
+        background-color: {c.button_hover};
+    }}
+
+    /* Minimalist ScrollBar */
     QScrollBar:vertical {{
         background: {c.card_bg};
-        width: 10px;
+        width: 8px;
         margin: 0px;
     }}
 
     QScrollBar::handle:vertical {{
         background: {c.border};
-        min-height: 20px;
-        border-radius: 5px;
+        min-height: 24px;
+        border-radius: 4px;
     }}
 
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
