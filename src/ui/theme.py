@@ -69,6 +69,7 @@ def get_theme(theme_name: str) -> ThemeColors:
 def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> str:
     c = get_theme(theme_name)
     font_stack = f'"{font_family}", "Linux Libertine", "Baskerville", "Georgia", "DejaVu Serif", serif'
+    ui_font_size = 10  # Standard crisp font size for UI controls, preventing layout overflow
 
     return f"""
     QMainWindow {{
@@ -155,6 +156,7 @@ def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> st
         background: transparent;
     }}
 
+    /* Writing Editor Uses Configured Font Size */
     QPlainTextEdit#DiaryEditor {{
         background-color: transparent;
         color: {c.text};
@@ -174,7 +176,7 @@ def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> st
         border-radius: 6px;
         padding: 6px;
         font-family: {font_stack};
-        font-size: {max(font_size - 2, 11)}pt;
+        font-size: {ui_font_size + 1}pt;
     }}
 
     QMenu::item {{
@@ -186,43 +188,61 @@ def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> st
         background-color: {c.button_hover};
     }}
 
-    /* Dialogs & Forms */
+    /* Dialogs & Tabs */
     QDialog {{
         background-color: {c.window_bg};
         color: {c.text};
+        font-family: {font_stack};
+        font-size: {ui_font_size}pt;
     }}
 
-    QGroupBox {{
-        color: {c.text};
-        font-family: {font_stack};
-        font-size: {max(font_size - 2, 11)}pt;
-        font-weight: 600;
+    QTabWidget::pane {{
         border: 1px solid {c.border};
         border-radius: 6px;
-        margin-top: 14px;
-        padding-top: 14px;
-        padding-bottom: 10px;
-        padding-left: 10px;
-        padding-right: 10px;
+        background-color: {c.card_bg};
+        top: -1px;
+        padding: 14px;
     }}
 
-    QGroupBox::title {{
-        subcontrol-origin: margin;
-        subcontrol-position: top left;
-        left: 12px;
-        padding: 0 4px;
-        background-color: {c.window_bg};
+    QTabBar::tab {{
+        background-color: {c.button_bg};
+        color: {c.subtle_text};
+        font-family: {font_stack};
+        font-size: {ui_font_size}pt;
+        font-weight: 500;
+        border: 1px solid {c.border};
+        border-bottom: none;
+        border-top-left-radius: 4px;
+        border-top-right-radius: 4px;
+        padding: 6px 14px;
+        margin-right: 4px;
+    }}
+
+    QTabBar::tab:selected {{
+        background-color: {c.card_bg};
+        color: {c.text};
+        font-weight: 600;
+        border-bottom: 1px solid {c.card_bg};
+    }}
+
+    QTabBar::tab:hover:!selected {{
+        background-color: {c.button_hover};
+    }}
+
+    QLabel {{
+        color: {c.text};
+        font-family: {font_stack};
+        font-size: {ui_font_size}pt;
     }}
 
     QLineEdit, QSpinBox, QComboBox {{
-        background-color: {c.card_bg};
+        background-color: {c.window_bg};
         color: {c.text};
         font-family: {font_stack};
-        font-size: {max(font_size - 2, 11)}pt;
+        font-size: {ui_font_size}pt;
         border: 1px solid {c.border};
         border-radius: 4px;
-        padding: 5px 8px;
-        min-height: 22px;
+        padding: 6px 10px;
     }}
 
     QLineEdit:focus, QSpinBox:focus, QComboBox:focus {{
@@ -237,17 +257,18 @@ def generate_stylesheet(theme_name: str, font_family: str, font_size: int) -> st
     QCheckBox {{
         color: {c.text};
         font-family: {font_stack};
-        font-size: {max(font_size - 2, 11)}pt;
+        font-size: {ui_font_size}pt;
+        spacing: 8px;
     }}
 
     QPushButton {{
         background-color: {c.button_bg};
         color: {c.button_text};
         font-family: {font_stack};
-        font-size: {max(font_size - 2, 11)}pt;
+        font-size: {ui_font_size}pt;
         border: 1px solid {c.border};
         border-radius: 4px;
-        padding: 6px 14px;
+        padding: 6px 16px;
     }}
 
     QPushButton:hover {{

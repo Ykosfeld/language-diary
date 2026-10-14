@@ -7,13 +7,14 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QTabWidget,
     QVBoxLayout,
+    QWidget,
 )
 
 from src.core.config import AppConfig, save_config
@@ -28,12 +29,12 @@ class SettingsDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("Configurações do Diário")
-        self.resize(480, 540)
-        self.setMinimumSize(420, 480)
+        self.resize(540, 430)
+        self.setMinimumSize(480, 380)
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(24, 24, 24, 24)
-        main_layout.setSpacing(18)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(16)
 
         # Apply current theme
         stylesheet = generate_stylesheet(
@@ -43,10 +44,17 @@ class SettingsDialog(QDialog):
         )
         self.setStyleSheet(stylesheet)
 
-        # --- Section 1: Appearance & Typography ---
-        appearance_group = QGroupBox("Aparência e Tipografia")
-        app_layout = QFormLayout(appearance_group)
-        app_layout.setSpacing(12)
+        # Tab Widget to organize settings cleanly without vertical overcrowding
+        self.tabs = QTabWidget()
+
+        # ==========================================
+        # Tab 1: Aparência e Política de Escrita
+        # ==========================================
+        tab_appearance = QWidget()
+        app_layout = QFormLayout(tab_appearance)
+        app_layout.setContentsMargins(16, 18, 16, 18)
+        app_layout.setVerticalSpacing(14)
+        app_layout.setHorizontalSpacing(16)
 
         self.theme_combo = QComboBox()
         self.theme_combo.addItem("Sépia (Papel Quente)", "sepia")
@@ -55,7 +63,7 @@ class SettingsDialog(QDialog):
         idx = self.theme_combo.findData(self.config.diary.theme)
         if idx >= 0:
             self.theme_combo.setCurrentIndex(idx)
-        app_layout.addRow("Tema:", self.theme_combo)
+        app_layout.addRow("Tema visual:", self.theme_combo)
 
         self.font_combo = QComboBox()
         fonts = ["Noto Serif", "Georgia", "DejaVu Serif", "Linux Libertine", "Baskerville", "Serif"]
@@ -67,51 +75,58 @@ class SettingsDialog(QDialog):
         else:
             self.font_combo.addItem(self.config.diary.font_family, self.config.diary.font_family)
             self.font_combo.setCurrentIndex(self.font_combo.count() - 1)
-        app_layout.addRow("Fonte:", self.font_combo)
+        app_layout.addRow("Tipografia do diário:", self.font_combo)
 
         self.font_size_spin = QSpinBox()
         self.font_size_spin.setRange(11, 26)
         self.font_size_spin.setValue(self.config.diary.font_size)
-        app_layout.addRow("Tamanho da Fonte:", self.font_size_spin)
-
-        main_layout.addWidget(appearance_group)
-
-        # --- Section 2: Immutability / Lock Policy ---
-        policy_group = QGroupBox("Política de Selagem ('Tinta no Papel')")
-        pol_layout = QFormLayout(policy_group)
-        pol_layout.setSpacing(12)
+        self.font_size_spin.setSuffix(" pt")
+        app_layout.addRow("Tamanho da fonte:", self.font_size_spin)
 
         self.policy_combo = QComboBox()
         self.policy_combo.addItem("Diário (Fecha à meia-noite)", "daily_midnight")
-        self.policy_combo.addItem("Manual (Trava ao clicar em selar)", "on_submit")
+        self.policy_combo.addItem("Manual (Botão para selar a qualquer momento)", "on_submit")
         idx_p = self.policy_combo.findData(self.config.diary.lock_policy)
         if idx_p >= 0:
             self.policy_combo.setCurrentIndex(idx_p)
-        pol_layout.addRow("Modo de Selagem:", self.policy_combo)
+        app_layout.addRow("Modo de selagem:", self.policy_combo)
 
-        main_layout.addWidget(policy_group)
+        self.tabs.addTab(tab_appearance, "Aparência & Diário")
 
-        # --- Section 3: Languages ---
-        lang_group = QGroupBox("Idiomas")
-        lang_layout = QFormLayout(lang_group)
-        lang_layout.setSpacing(12)
+        # ==========================================
+        # Tab 2: Idiomas
+        # ==========================================
+        tab_lang = QWidget()
+        lang_layout = QFormLayout(tab_lang)
+        lang_layout.setContentsMargins(16, 18, 16, 18)
+        lang_layout.setVerticalSpacing(14)
+        lang_layout.setHorizontalSpacing(16)
 
         self.native_lang_edit = QLineEdit(self.config.user.native_language)
-        lang_layout.addRow("Idioma Nativo:", self.native_lang_edit)
+        lang_layout.addRow("Seu idioma nativo:", self.native_lang_edit)
 
         langs_str = ", ".join(self.config.user.available_languages)
         self.languages_edit = QLineEdit(langs_str)
         self.languages_edit.setToolTip("Separe os códigos por vírgula (ex: de, en, fr)")
-        lang_layout.addRow("Idiomas de Prática:", self.languages_edit)
+        lang_layout.addRow("Idiomas de prática:", self.languages_edit)
 
-        main_layout.addWidget(lang_group)
+        helper_label = QLabel("Dica: você pode alternar o idioma ativo diretamente pelo botão na barra lateral.")
+        helper_label.setWordWrap(True)
+        helper_label.setStyleSheet("font-style: italic; opacity: 0.8;")
+        lang_layout.addRow("", helper_label)
 
-        # --- Section 4: AI & NLP Engine ---
-        nlp_group = QGroupBox("Motor Analítico e IA")
-        nlp_layout = QFormLayout(nlp_group)
-        nlp_layout.setSpacing(12)
+        self.tabs.addTab(tab_lang, "Idiomas")
 
-        self.run_on_lock_check = QCheckBox("Executar análise em background ao selar")
+        # ==========================================
+        # Tab 3: Motor Analítico e IA (Fases 2/3)
+        # ==========================================
+        tab_nlp = QWidget()
+        nlp_layout = QFormLayout(tab_nlp)
+        nlp_layout.setContentsMargins(16, 18, 16, 18)
+        nlp_layout.setVerticalSpacing(14)
+        nlp_layout.setHorizontalSpacing(16)
+
+        self.run_on_lock_check = QCheckBox("Disparar análise em segundo plano ao selar a página")
         self.run_on_lock_check.setChecked(self.config.nlp.run_on_lock)
         nlp_layout.addRow("", self.run_on_lock_check)
 
@@ -126,10 +141,13 @@ class SettingsDialog(QDialog):
         self.model_edit = QLineEdit(self.config.nlp.llm_model)
         nlp_layout.addRow("Modelo LLM:", self.model_edit)
 
-        main_layout.addWidget(nlp_group)
+        self.tabs.addTab(tab_nlp, "Inteligência Artificial")
 
-        # --- Action Buttons ---
+        main_layout.addWidget(self.tabs, 1)
+
+        # --- Action Buttons at Bottom ---
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(12)
         btn_layout.addStretch()
 
         self.cancel_btn = QPushButton("Cancelar")
