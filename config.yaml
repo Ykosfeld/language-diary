@@ -6,11 +6,15 @@ user:
   - en
 diary:
   lock_policy: daily_midnight
-  theme: paper_dark
-  font_family: DejaVu Serif
-  font_size: 14
+  theme: solarized_light
+  font_family: Noto Serif
+  font_size: 18
   auto_save_delay_ms: 1000
 nlp:
   run_on_lock: true
+  languagetool:
+    enabled: true
+    server_url: http://localhost:8010/v2
+    timeout_seconds: 4.0
   llm_provider: ollama
   llm_model: llama3.1:8b

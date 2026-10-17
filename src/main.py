@@ -17,7 +17,7 @@ except ModuleNotFoundError:
     raise
 
 from src.core.config import load_config
-from src.core.database import Database, EntryRepository
+from src.core.database import Database, Entry, EntryRepository
 from src.core.lock_manager import LockManager
 from src.ui.writer_window import WriterWindow
 
@@ -34,6 +34,18 @@ def main() -> None:
     # Initialize lock manager and enforce startup midnight locks
     lock_manager = LockManager(config, repository)
     lock_manager.enforce_daily_lock()
+
+    # Initialize Phase 2 NLP Engine and connect background analysis worker
+    from src.nlp.engine import NLPEngine
+    from src.nlp.worker import start_background_analysis
+
+    nlp_engine = NLPEngine(config)
+
+    if config.nlp.run_on_lock:
+        def on_entry_locked(entry: Entry) -> None:
+            start_background_analysis(entry, nlp_engine, repository)
+
+        lock_manager.register_on_locked_callback(on_entry_locked)
 
     # Initialize Qt Application
     app = QApplication(sys.argv)

@@ -23,8 +23,16 @@ class DiaryConfig:
 
 
 @dataclass
+class LanguageToolConfig:
+    enabled: bool = True
+    server_url: str = "http://localhost:8010/v2"
+    timeout_seconds: float = 4.0
+
+
+@dataclass
 class NLPConfig:
     run_on_lock: bool = True
+    languagetool: LanguageToolConfig = field(default_factory=LanguageToolConfig)
     llm_provider: str = "ollama"
     llm_model: str = "llama3.1:8b"
 
@@ -80,8 +88,16 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
         auto_save_delay_ms=int(diary_data.get("auto_save_delay_ms", 1000)),
     )
 
+    lt_data = nlp_data.get("languagetool", {})
+    lt_cfg = LanguageToolConfig(
+        enabled=bool(lt_data.get("enabled", True)),
+        server_url=str(lt_data.get("server_url", "http://localhost:8010/v2")),
+        timeout_seconds=float(lt_data.get("timeout_seconds", 4.0)),
+    )
+
     nlp_cfg = NLPConfig(
         run_on_lock=bool(nlp_data.get("run_on_lock", True)),
+        languagetool=lt_cfg,
         llm_provider=nlp_data.get("llm_provider", "ollama"),
         llm_model=nlp_data.get("llm_model", "llama3.1:8b"),
     )
@@ -112,6 +128,11 @@ def save_config(config: AppConfig, config_path: Optional[Path] = None) -> None:
         },
         "nlp": {
             "run_on_lock": config.nlp.run_on_lock,
+            "languagetool": {
+                "enabled": config.nlp.languagetool.enabled,
+                "server_url": config.nlp.languagetool.server_url,
+                "timeout_seconds": config.nlp.languagetool.timeout_seconds,
+            },
             "llm_provider": config.nlp.llm_provider,
             "llm_model": config.nlp.llm_model,
         },

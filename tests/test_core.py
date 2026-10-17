@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from pathlib import Path
 import pytest
 from src.core.config import AppConfig, DiaryConfig, load_config, save_config
-from src.core.database import Database, EntryRepository
+from src.core.database import Database, EntryRepository, ErrorLogRecord
 from src.core.lock_manager import LockManager
 
 
@@ -102,3 +102,89 @@ def test_config_load_and_save(tmp_path: Path):
     loaded = load_config(cfg_file)
     assert loaded.user.active_target_language == "en"
     assert loaded.diary.theme == "solarized_light"
+
+
+def test_save_analysis_results_and_retrieve(entry_repo: EntryRepository):
+    today = date.today().isoformat()
+    entry = entry_repo.create_entry(today, "de", "Ich gehe in das Park.")
+    entry_repo.lock_entry(entry.id)
+
+    errors = [
+        ErrorLogRecord(
+            id=None,
+            entry_id=entry.id,
+            target_language="de",
+            category="GRAMMAR",
+            rule_id="DE_AGREEMENT",
+            rule_description="Genusfehler",
+            message="Der Artikel stimmt nicht mit dem Nomen überein.",
+            original_span="das",
+            expected_span="den",
+            sentence_context="Ich gehe in das Park.",
+            word_target="park",
+        )
+    ]
+    annotated = 'Ich gehe in <err type="declination" expected="den">das</err> Park.'
+    success = entry_repo.save_analysis_results(entry.id, annotated, errors)
+    assert success is True
+
+    updated_entry = entry_repo.get_by_id(entry.id)
+    assert updated_entry.status == "ANALYZED"
+    assert updated_entry.annotated_text == annotated
+
+    saved_errors = entry_repo.get_errors_for_entry(entry.id)
+    assert len(saved_errors) == 1
+    assert saved_errors[0].category == "GRAMMAR"
+    assert saved_errors[0].rule_id == "DE_AGREEMENT"
+    assert saved_errors[0].word_target == "park"
+
+
+def test_error_logs_schema_migration(tmp_path: Path):
+    import sqlite3
+    db_file = tmp_path / "legacy_diary.db"
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("""
+        CREATE TABLE entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_date TEXT NOT NULL,
+            target_language TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'DRAFT',
+            raw_text TEXT NOT NULL,
+            annotated_text TEXT,
+            word_count INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            locked_at TIMESTAMP
+        );
+    """)
+    conn.execute("""
+        CREATE TABLE error_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+            target_language TEXT NOT NULL,
+            error_type TEXT NOT NULL,
+            original_span TEXT,
+            expected_span TEXT,
+            sentence_context TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    conn.execute("INSERT INTO entries (id, entry_date, target_language, raw_text) VALUES (1, '2026-10-10', 'de', 'Test');")
+    conn.execute("INSERT INTO error_logs (entry_id, target_language, error_type, original_span, expected_span, sentence_context) VALUES (1, 'de', 'declination', 'das', 'den', 'Test frase');")
+    conn.commit()
+    conn.close()
+
+    # Now open with Database class, which should run migration
+    db = Database(db_file)
+    with db.session() as cursor:
+        cursor.execute("PRAGMA table_info(error_logs);")
+        cols = {row["name"] for row in cursor.fetchall()}
+        assert "category" in cols
+        assert "word_target" in cols
+        assert "rule_id" in cols
+        assert "error_type" not in cols
+
+        cursor.execute("SELECT * FROM error_logs WHERE entry_id = 1;")
+        row = cursor.fetchone()
+        assert row["original_span"] == "das"
+        assert row["expected_span"] == "den"
+        assert row["category"] == "declination"
