@@ -34,11 +34,12 @@ language-diary/
 │   │   ├── config.py           # Loader e validação do config.yaml
 │   │   ├── database.py         # Conexão SQLite, migrations e repositórios
 │   │   └── lock_manager.py     # Lógica de imutabilidade (midnight vs on_submit)
-│   ├── nlp/                    # Fase 2: Motor Analítico Diário
-│   │   ├── base_engine.py      # Interface abstrata (Language Agnostic)
-│   │   ├── corrector.py        # Modelo GEC local (Seq2Seq / GECToR / LanguageTool)
-│   │   ├── aligner.py          # Diff de tokens + Classificação via spaCy (UD)
-│   │   └── xml_serializer.py   # Conversor de spans de erro para tags <err> e HTML
+│   ├── nlp/                    # Fase 2: Motor Analítico Diário (Híbrido: LT + LLM)
+│   │   ├── base_engine.py      # Interface abstrata do motor analítico
+│   │   ├── languagetool_client.py # Filtro Mecânico: Cliente HTTP local (LanguageTool Server)
+│   │   ├── llm_syntax_judge.py # Juiz Sintático: Ollama JSON focado em Word Order & Sintaxe
+│   │   ├── normalizer.py       # Extração de word_target e normalização de termos
+│   │   └── annotator.py        # Mesclador e serializador posicional de tags <err>
 │   ├── llm/                    # Fases 3 e 4: Relatórios e RAG
 │   │   ├── retriever.py        # Queries estruturadas de erros recorrentes no SQLite
 │   │   ├── prompt_builder.py   # Montagem do prompt longitudinal
@@ -98,15 +99,26 @@ CREATE TABLE entries (
     locked_at TIMESTAMP
 );
 
--- Tabela desnormalizada de erros para facilitar agregações estatísticas e RAG (Fase 4)
+-- Tabela analítica de erros para agregações estatísticas, dashboard e RAG (Fases 3 e 4)
 CREATE TABLE error_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
-    target_language TEXT NOT NULL,
-    error_type TEXT NOT NULL,            -- Ex: 'declination', 'word_order'
-    original_span TEXT,                  -- Ex: 'das'
-    expected_span TEXT,                  -- Ex: 'den'
-    sentence_context TEXT NOT NULL,      -- Frase completa onde o erro ocorreu
+    target_language TEXT NOT NULL,       -- Ex: 'de', 'en'
+    
+    -- Categorização do erro (baseada no LanguageTool / taxonomia universal)
+    category TEXT NOT NULL,              -- Macro-categoria: 'GRAMMAR', 'TYPOS', 'CASING', 'SYNTAX'
+    rule_id TEXT NOT NULL,               -- Regra específica: 'DE_AGREEMENT', 'GERMAN_SPELLER_RULE', 'NON3PRS_VERB'
+    rule_description TEXT,               -- Descrição amigável da regra violada
+    message TEXT,                        -- Mensagem pedagógica explicativa
+    
+    -- Spans contextuais
+    original_span TEXT NOT NULL,         -- Trecho original incorreto (ex: 'das Park', 'muede')
+    expected_span TEXT,                  -- Correção prioritária recomendada (ex: 'den Park', 'müde')
+    sentence_context TEXT NOT NULL,      -- Frase completa onde o erro ocorreu (para estudo/RAG)
+    
+    -- Campo analítico normalizado para ranking de vocabulário problemático ("qual palavra mais erro?")
+    word_target TEXT,                    -- Palavra-alvo correta normalizada/minúscula (ex: 'park', 'müde', 'go')
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -120,7 +132,9 @@ CREATE TABLE weekly_reports (
 );
 
 CREATE INDEX idx_entries_date_lang ON entries(entry_date, target_language);
-CREATE INDEX idx_errors_lang_type ON error_logs(target_language, error_type);
+CREATE INDEX idx_errors_lang_rule ON error_logs(target_language, rule_id);
+CREATE INDEX idx_errors_word_target ON error_logs(target_language, word_target);
+CREATE INDEX idx_errors_entry_id ON error_logs(entry_id);
 ```
 
 ---
@@ -137,21 +151,35 @@ CREATE INDEX idx_errors_lang_type ON error_logs(target_language, error_type);
       - Modo `daily_midnight`: Permite editar a página do dia atual (`status = 'DRAFT'`) com auto-save; na inicialização do app (ou virada de data), trava automaticamente páginas de dias anteriores (`status = 'LOCKED'`).
       - Modo `on_submit`: Botão "Finalizar Página" que trava imediatamente a entrada atual e permite abrir novas entradas no mesmo dia.
 
-### Fase 2: O Motor Analítico Diário (NLP Local e In-line Annotation)
+### Fase 2: O Motor Analítico Diário (Pipeline Híbrido: LanguageTool + LLM Sintático)
 
 - [ ] **Worker Assíncrono:** Fila em background (`QThread`) que processa entradas recém-travadas (`LOCKED` -> `ANALYZED`) sem bloquear a UI.
-- [ ] **Pipeline GEC + Alinhamento Universal Dependencies:**
-      - *Passo 1 (Correção):* Geração da versão corrigida frase a frase via modelo local leve (Seq2Seq GEC para Alemão/Inglês ou integração com LanguageTool local).
-      - *Passo 2 (Alinhamento e Tipagem):* Comparação entre frase original e corrigida usando `spaCy` (`de_core_news_md` / `en_core_web_md`) para extrair mudanças morfossintáticas (`Case`, `Gender`, `VerbForm`, `WordOrder`) e classificar o `type` de forma agnóstica de idioma.
-- [ ] **Serialização e Persistência:** Injetar as tags `<err>` gerando o `annotated_text` na tabela `entries` e popular os registros individuais na tabela `error_logs`.
+- [ ] **Arquitetura em Duas Etapas (Cascade / Staged Pipeline):**
+      - *Etapa 1 (Filtro Mecânico - LanguageTool Local):*
+        - Envio de `raw_text` para o LanguageTool HTTP Server (`/v2/check`).
+        - Filtro ultra-rápido (<50ms) e determinístico para erros ortográficos (`TYPOS`), capitalização de substantivos (`CASING`) e concordâncias imediatas de gênero/número/caso (`DE_AGREEMENT`).
+        - Gera a lista de spans mecânicos com `offset` e `length` e produz um `clean_text` temporário (com as correções locais aplicadas).
+      - *Etapa 2 (Juiz Sintático Especializado - Ollama LLM):*
+        - Envio do `clean_text` para o LLM local (`llama3.1:8b` via Ollama) com prompt cirúrgico e saída estritamente em JSON (`format: "json"`).
+        - *Guardrails de Prompt (Negative Constraints):* O LLM é expressamente proibido de corrigir erros de digitação, pontuação trivial ou reescrever frases por questões de "estilo/beleza". Seu foco é exclusivo em desvios estruturais graves que o LanguageTool não cobre:
+          1. *Word Order:* Posição do verbo conjugado em orações subordinadas (*Nebensätze* com *weil/dass/obwohl*), posição do particípio no *Perfekt*, regra V2 em orações principais.
+          2. *Regência Verbal e Preposições:* Preposição obrigatória omitida ou incorreta exigida pelo verbo.
+      - *Etapa 3 (Mesclagem, Resolução de Sobreposição e Persistência):*
+        - *No SQLite (`error_logs`):* Todos os erros detectados por ambos os motores são registrados individualmente com seus respectivos metadados (`category`, `rule_id`, `message`, `word_target`).
+        - *No Texto Anotado (`annotated_text`):* O `annotator.py` reconcilia os spans. Em caso de colisão (ex: um erro de digitação local que ocorre dentro de uma oração subordinada com erro de *Word Order*), a anotação visual prioriza a tag estrutural macro (`word_order`), preservando a clareza e evitando poluição visual nas marcações. Extrai-se o `word_target` normalizado para alimentar as métricas do banco.
 
 ### Fase 3: A "Mesa do Professor" (Dashboard Semanal, LLM e Folha Corrigida)
 
 - [ ] **Janela Separada (Dashboard):** Interface dedicada para estudo e revisão, isolada do ambiente de escrita.
-- [ ] **Visão Macro (Feedback Qualitativo em Lote):** Agregador que coleta as entradas `annotated_text` da semana e envia em lote para o LLM (via Ollama local ou API). A leitura direta das tags in-line permite ao LLM gerar um relatório pedagógico encorajador e contextualizado, salvo em `weekly_reports`.
-- [ ] **Visão Micro ("Rabiscos do Professor"):** Aba/modal secundário onde o usuário seleciona uma entrada passada já fechada e visualiza o texto com marcações visuais estilo revisão de caderno (renderização HTML/CSS das tags `<err>`: texto original riscado, correção esperada destacada e tooltip com o tipo gramatical).
+- [ ] **Visão Macro (Dashboard Estatístico e Feedback em Lote):**
+      - *Cards Analíticos:* Métricas agregadas via SQLite com:
+        - **Top Regras Violadas:** Ranking das infrações gramaticais mais frequentes (`rule_id` / `category`).
+        - **Palavras Traiçoeiras:** Ranking das palavras mais frequentemente erradas (`word_target`) com histórico de como foram escritas vs forma correta.
+        - **Evolução Longitudinal:** Gráfico de linha da taxa de erros normalizada a cada 100 palavras ao longo das semanas.
+      - *Feedback Qualitativo:* Agregador que envia o resumo estatístico e amostras de frases para o LLM local (Ollama `llama3.1:8b`) para gerar um relatório pedagógico encorajador salvo em `weekly_reports`.
+- [ ] **Visão Micro ("Rabiscos do Professor"):** Aba/modal secundário onde o usuário seleciona uma entrada passada já fechada e visualiza o texto com marcações visuais estilo revisão de caderno (renderização HTML/CSS das tags `<err>`: texto original riscado, correção esperada destacada e tooltip com a explicação pedagógica).
 
 ### Fase 4: Memória de Longo Prazo e RAG Longitudinal
 
-- [ ] **Retrieval Estruturado (`error_logs`):** Consultas SQL analíticas que identificam os *top N* tipos de erro mais frequentes nas últimas semanas, variações de taxa de erro por 100 palavras e exemplos de frases anteriores com a mesma falha.
-- [ ] **Injeção de Contexto Longitudinal:** Enriquecimento automático do prompt da Fase 3 com o histórico recuperado (ex: *"Nas últimas 3 semanas, o aluno reduziu erros de `word_order` em orações subordinadas em 40%, mas ainda persiste a troca entre Acusativo e Dativo após preposições de movimento"*), permitindo que o "professor" reconheça evoluções e foque nos pontos cegos reais.
+- [ ] **Retrieval Estruturado (`error_logs`):** Consultas SQL analíticas que identificam os *top N* tipos de erro mais frequentes nas últimas semanas, variações de taxa de erro por 100 palavras e histórico de palavras reincidentes em `word_target`.
+- [ ] **Injeção de Contexto Longitudinal:** Enriquecimento automático do prompt da Fase 3 com o histórico recuperado (ex: *"Nas últimas semanas, o aluno eliminou erros de capitalização de substantivos, mas ainda persiste na confusão de gênero para a palavra 'Park' e erros com preposições acusativas"*), permitindo que o "professor" reconheça evoluções e foque nos pontos cegos reais.
